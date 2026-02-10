@@ -135,6 +135,187 @@ if (heroTitle) {
 console.log('%c Welcome to Vinayak C S Portfolio ', 'background: linear-gradient(135deg, #2563eb, #7c3aed); color: white; padding: 10px 20px; border-radius: 5px; font-size: 14px;');
 
 // =====================
+// IndexedDB for Storage
+// =====================
+const DB_NAME = 'PortfolioDB';
+const DB_VERSION = 1;
+let db = null;
+
+// Initialize IndexedDB
+function initDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+            db = request.result;
+            resolve(db);
+        };
+
+        request.onupgradeneeded = (event) => {
+            const database = event.target.result;
+
+            // Store for profile image
+            if (!database.objectStoreNames.contains('profile')) {
+                database.createObjectStore('profile', { keyPath: 'id' });
+            }
+
+            // Store for posts
+            if (!database.objectStoreNames.contains('posts')) {
+                database.createObjectStore('posts', { keyPath: 'id', autoIncrement: true });
+            }
+        };
+    });
+}
+
+// Save to IndexedDB
+function saveToDB(storeName, data) {
+    return new Promise((resolve, reject) => {
+        if (!db) {
+            reject('Database not initialized');
+            return;
+        }
+        const transaction = db.transaction(storeName, 'readwrite');
+        const store = transaction.objectStore(storeName);
+        const request = store.put(data);
+
+        request.onsuccess = () => {
+            showSaveNotification();
+            resolve(request.result);
+        };
+        request.onerror = () => reject(request.error);
+    });
+}
+
+// Get from IndexedDB
+function getFromDB(storeName, key) {
+    return new Promise((resolve, reject) => {
+        if (!db) {
+            reject('Database not initialized');
+            return;
+        }
+        const transaction = db.transaction(storeName, 'readonly');
+        const store = transaction.objectStore(storeName);
+        const request = store.get(key);
+
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+// Get all from IndexedDB
+function getAllFromDB(storeName) {
+    return new Promise((resolve, reject) => {
+        if (!db) {
+            reject('Database not initialized');
+            return;
+        }
+        const transaction = db.transaction(storeName, 'readonly');
+        const store = transaction.objectStore(storeName);
+        const request = store.getAll();
+
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+// Clear store in IndexedDB
+function clearStore(storeName) {
+    return new Promise((resolve, reject) => {
+        if (!db) {
+            reject('Database not initialized');
+            return;
+        }
+        const transaction = db.transaction(storeName, 'readwrite');
+        const store = transaction.objectStore(storeName);
+        const request = store.clear();
+
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
+// Delete from IndexedDB
+function deleteFromDB(storeName, key) {
+    return new Promise((resolve, reject) => {
+        if (!db) {
+            reject('Database not initialized');
+            return;
+        }
+        const transaction = db.transaction(storeName, 'readwrite');
+        const store = transaction.objectStore(storeName);
+        const request = store.delete(key);
+
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+}
+
+// Show save notification
+function showSaveNotification() {
+    let notification = document.getElementById('saveNotification');
+    if (!notification) {
+        notification = document.createElement('div');
+        notification.id = 'saveNotification';
+        notification.innerHTML = '<i class="fas fa-check-circle"></i> Saved';
+        notification.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4);
+            z-index: 9999;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        `;
+        document.body.appendChild(notification);
+    }
+
+    notification.style.opacity = '1';
+    notification.style.transform = 'translateY(0)';
+
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateY(20px)';
+    }, 2000);
+}
+
+// Compress image before saving
+function compressImage(dataUrl, maxWidth = 800, quality = 0.7) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxWidth) {
+                height = (height * maxWidth) / width;
+                width = maxWidth;
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.src = dataUrl;
+    });
+}
+
+// =====================
 // Profile Image Upload
 // =====================
 const imageUpload = document.getElementById('imageUpload');
@@ -142,11 +323,19 @@ const profileImage = document.getElementById('profileImage');
 const profilePlaceholder = document.getElementById('profilePlaceholder');
 const postAvatar = document.getElementById('postAvatar');
 
-// Load saved profile image from localStorage
-function loadProfileImage() {
-    const savedImage = localStorage.getItem('profileImage');
-    if (savedImage) {
-        updateProfileImages(savedImage);
+// Load saved profile image from IndexedDB
+async function loadProfileImage() {
+    try {
+        const profileData = await getFromDB('profile', 'main');
+        if (profileData && profileData.image) {
+            updateProfileImages(profileData.image);
+        }
+    } catch (e) {
+        // Fallback to localStorage
+        const savedImage = localStorage.getItem('profileImage');
+        if (savedImage) {
+            updateProfileImages(savedImage);
+        }
     }
 }
 
@@ -172,23 +361,31 @@ function updateProfileImages(imageSrc) {
 }
 
 if (imageUpload) {
-    imageUpload.addEventListener('change', function(e) {
+    imageUpload.addEventListener('change', async function(e) {
         const file = e.target.files[0];
         if (file) {
             const reader = new FileReader();
-            reader.onload = function(e) {
-                const imageSrc = e.target.result;
+            reader.onload = async function(e) {
+                let imageSrc = e.target.result;
+
+                // Compress image
+                imageSrc = await compressImage(imageSrc, 400, 0.8);
+
                 updateProfileImages(imageSrc);
-                // Save to localStorage
-                localStorage.setItem('profileImage', imageSrc);
+
+                // Save to IndexedDB
+                try {
+                    await saveToDB('profile', { id: 'main', image: imageSrc });
+                } catch (err) {
+                    // Fallback to localStorage
+                    localStorage.setItem('profileImage', imageSrc);
+                    showSaveNotification();
+                }
             };
             reader.readAsDataURL(file);
         }
     });
 }
-
-// Load profile image on page load
-loadProfileImage();
 
 // =====================
 // Post Modal
@@ -271,8 +468,9 @@ if (postImageUpload) {
         const file = e.target.files[0];
         if (file) {
             const reader = new FileReader();
-            reader.onload = function(e) {
-                currentMedia = e.target.result;
+            reader.onload = async function(e) {
+                // Compress image for storage
+                currentMedia = await compressImage(e.target.result, 800, 0.7);
                 currentMediaType = 'image';
                 if (mediaPreview) {
                     mediaPreview.innerHTML = `<img src="${currentMedia}" alt="Post image">`;
@@ -436,33 +634,174 @@ document.querySelectorAll('.action-btn').forEach(btn => {
     }
 });
 
-// Save posts to localStorage
-function savePosts() {
+// Save posts to IndexedDB
+async function savePosts() {
     if (postsFeed) {
-        localStorage.setItem('posts', postsFeed.innerHTML);
+        const posts = [];
+        postsFeed.querySelectorAll('.post-card').forEach((card, index) => {
+            const content = card.querySelector('.post-content p');
+            const media = card.querySelector('.post-media');
+            const date = card.querySelector('.post-date');
+            const liked = card.querySelector('.like-btn.liked') !== null;
+
+            let mediaData = null;
+            let mediaType = null;
+
+            if (media) {
+                const img = media.querySelector('img');
+                const video = media.querySelector('video source');
+                const iframe = media.querySelector('iframe');
+
+                if (img) {
+                    mediaData = img.src;
+                    mediaType = 'image';
+                } else if (video) {
+                    mediaData = video.src;
+                    mediaType = 'video';
+                } else if (iframe) {
+                    mediaData = iframe.src;
+                    mediaType = 'embed';
+                }
+            }
+
+            posts.push({
+                id: index,
+                text: content ? content.textContent : '',
+                media: mediaData,
+                mediaType: mediaType,
+                date: date ? date.textContent : 'Just now',
+                liked: liked
+            });
+        });
+
+        try {
+            await clearStore('posts');
+            for (const post of posts) {
+                await saveToDB('posts', post);
+            }
+        } catch (err) {
+            console.error('Error saving posts:', err);
+            // Fallback: try localStorage for text-only
+            try {
+                const textOnlyPosts = posts.map(p => ({
+                    ...p,
+                    media: p.mediaType === 'embed' ? p.media : null // Only keep embed URLs
+                }));
+                localStorage.setItem('posts', JSON.stringify(textOnlyPosts));
+                showSaveNotification();
+            } catch (e) {
+                console.error('localStorage also failed:', e);
+            }
+        }
     }
 }
 
-// Load posts from localStorage
-function loadPosts() {
-    const savedPosts = localStorage.getItem('posts');
-    if (savedPosts && postsFeed) {
-        postsFeed.innerHTML = savedPosts;
+// Load posts from IndexedDB
+async function loadPosts() {
+    if (!postsFeed) return;
 
-        // Re-attach like handlers
-        document.querySelectorAll('.like-btn').forEach(btn => {
-            btn.addEventListener('click', handleLike);
-        });
+    try {
+        const posts = await getAllFromDB('posts');
 
-        // Re-attach menu handlers
-        document.querySelectorAll('.post-card').forEach(postCard => {
-            initPostMenu(postCard);
-        });
+        if (posts && posts.length > 0) {
+            // Clear default posts
+            postsFeed.innerHTML = '';
+
+            // Sort by id (newest first - higher id = newer)
+            posts.sort((a, b) => a.id - b.id);
+
+            const savedProfileImage = await getFromDB('profile', 'main');
+            const avatarSrc = savedProfileImage?.image || '';
+
+            posts.forEach(post => {
+                const avatarHtml = avatarSrc
+                    ? `<img src="${avatarSrc}" alt="Avatar" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">`
+                    : `<i class="fas fa-user"></i>`;
+
+                let mediaHtml = '';
+                if (post.media && post.mediaType) {
+                    if (post.mediaType === 'image') {
+                        mediaHtml = `<div class="post-media"><img src="${post.media}" alt="Post image"></div>`;
+                    } else if (post.mediaType === 'video') {
+                        mediaHtml = `<div class="post-media"><video controls><source src="${post.media}"></video></div>`;
+                    } else if (post.mediaType === 'embed') {
+                        mediaHtml = `<div class="post-media"><iframe width="100%" height="315" src="${post.media}" frameborder="0" allowfullscreen style="border-radius: 12px;"></iframe></div>`;
+                    }
+                }
+
+                const postHtml = `
+                    <article class="post-card">
+                        <div class="post-header">
+                            <div class="post-author">
+                                <div class="author-avatar">
+                                    ${avatarHtml}
+                                </div>
+                                <div class="author-info">
+                                    <h4>Vinayak C S</h4>
+                                    <span class="post-date">${post.date}</span>
+                                </div>
+                            </div>
+                            <div class="post-menu">
+                                <button class="post-menu-btn"><i class="fas fa-ellipsis-h"></i></button>
+                                <div class="post-dropdown">
+                                    <button class="dropdown-item edit-post-btn"><i class="fas fa-edit"></i> Edit</button>
+                                    <button class="dropdown-item delete-post-btn"><i class="fas fa-trash"></i> Delete</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="post-content">
+                            ${post.text ? `<p>${post.text}</p>` : ''}
+                            ${mediaHtml}
+                        </div>
+                        <div class="post-actions">
+                            <button class="action-btn like-btn ${post.liked ? 'liked' : ''}">
+                                <i class="${post.liked ? 'fas' : 'far'} fa-heart"></i> Like
+                            </button>
+                            <button class="action-btn"><i class="far fa-comment"></i> Comment</button>
+                            <button class="action-btn"><i class="fas fa-share"></i> Share</button>
+                        </div>
+                    </article>
+                `;
+
+                postsFeed.insertAdjacentHTML('beforeend', postHtml);
+            });
+
+            // Re-attach handlers
+            document.querySelectorAll('.like-btn').forEach(btn => {
+                btn.addEventListener('click', handleLike);
+            });
+
+            document.querySelectorAll('.post-card').forEach(postCard => {
+                initPostMenu(postCard);
+            });
+        }
+    } catch (err) {
+        console.error('Error loading posts:', err);
+        // Fallback to localStorage
+        try {
+            const savedPosts = localStorage.getItem('posts');
+            if (savedPosts) {
+                const posts = JSON.parse(savedPosts);
+                // Reconstruct posts from localStorage data
+                console.log('Loaded from localStorage fallback');
+            }
+        } catch (e) {
+            console.error('localStorage fallback also failed:', e);
+        }
     }
 }
 
-// Uncomment to enable post persistence
-// loadPosts();
+// Auto-save on visibility change (when user leaves page)
+document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'hidden') {
+        savePosts();
+    }
+});
+
+// Save before page unload
+window.addEventListener('beforeunload', function() {
+    savePosts();
+});
 
 // Keyboard shortcuts
 document.addEventListener('keydown', function(e) {
@@ -721,3 +1060,33 @@ closeModal = function() {
         }
     }
 };
+
+// =====================
+// Initialize Application
+// =====================
+async function initApp() {
+    try {
+        // Initialize IndexedDB
+        await initDB();
+        console.log('IndexedDB initialized');
+
+        // Load profile image
+        await loadProfileImage();
+
+        // Load saved posts
+        await loadPosts();
+
+        console.log('Portfolio data loaded successfully');
+    } catch (err) {
+        console.error('Error initializing app:', err);
+        // Fallback: try loading from localStorage
+        loadProfileImage();
+    }
+}
+
+// Start the app when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initApp);
+} else {
+    initApp();
+}
