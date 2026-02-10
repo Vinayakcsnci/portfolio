@@ -50,8 +50,8 @@
             <div class="hero-visual">
                 <div class="profile-image-container">
                     <div class="profile-image-wrapper">
-                        <img id="profileImage" src="" alt="Vinayak C S" class="profile-image">
-                        <div class="profile-placeholder" id="profilePlaceholder">
+                        <img id="profileImage" src="profile.png" alt="Vinayak C S" class="profile-image has-image">
+                        <div class="profile-placeholder hidden" id="profilePlaceholder">
                             <i class="fas fa-user"></i>
                         </div>
                         <label for="imageUpload" class="image-upload-btn">
@@ -219,8 +219,8 @@
             <div class="create-post-card">
                 <div class="create-post-header">
                     <div class="create-post-avatar">
-                        <img id="postAvatar" src="" alt="Avatar">
-                        <div class="avatar-placeholder"><i class="fas fa-user"></i></div>
+                        <img id="postAvatar" src="profile.png" alt="Avatar" class="has-image">
+                        <div class="avatar-placeholder hidden"><i class="fas fa-user"></i></div>
                     </div>
                     <button class="create-post-btn" id="openPostModal">
                         <i class="fas fa-plus"></i> Share a post or video
@@ -240,7 +240,7 @@
                     <div class="post-header">
                         <div class="post-author">
                             <div class="author-avatar">
-                                <i class="fas fa-user"></i>
+                                <img src="profile.png" alt="Avatar" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
                             </div>
                             <div class="author-info">
                                 <h4>Vinayak C S</h4>
@@ -270,7 +270,7 @@
                     <div class="post-header">
                         <div class="post-author">
                             <div class="author-avatar">
-                                <i class="fas fa-user"></i>
+                                <img src="profile.png" alt="Avatar" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;">
                             </div>
                             <div class="author-info">
                                 <h4>Vinayak C S</h4>
@@ -286,10 +286,12 @@
                         </div>
                     </div>
                     <div class="post-content">
-                        <p>Check out this demo of our Computer Vision solution for healthcare diagnostics!</p>
-                        <div class="post-media video-placeholder">
-                            <i class="fas fa-play-circle"></i>
-                            <span>Click to add video</span>
+                        <p>Here's a quick introduction about myself and my work in AI and Digital Transformation!</p>
+                        <div class="post-media">
+                            <video controls style="width: 100%; border-radius: 12px;">
+                                <source src="intro-video.mp4" type="video/mp4">
+                                Your browser does not support the video tag.
+                            </video>
                         </div>
                     </div>
                     <div class="post-actions">
